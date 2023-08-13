@@ -16,6 +16,8 @@ QUERY="
             number\
             title\
             state\
+            resourcePath\
+            url\
             createdAt\
             mergedAt\
             closingIssuesReferences(last: 5){\
@@ -33,8 +35,10 @@ QUERY="
                 }\
             }\
             files(last: 10) {\
-                nodes {\
-                    path\
+                edges {\
+                    node {\
+                        path\
+                    }\
                 }\
             }\
           }\
@@ -74,7 +78,16 @@ cat response.json | jq -r '
       map("- " + .node.body) | join("\n")) 
   else
     "None"
-  end) + "\n"
+  end) + "\n" +
+  "- Files: " +
+  (if .node.files.edges | length > 0 then
+    (.node.files.edges | 
+      map("- " + .node.path) | join("\n"))
+  else
+    "None"
+  end) + "\n" +
+  "- Resource Path: " + .node.resourcePath + "\n" +
+  "- Resource URL: " + .node.url + "\n"
 ' >> report.md
 
 # Optionally, you can remove the response file after processing
