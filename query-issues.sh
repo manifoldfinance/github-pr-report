@@ -8,7 +8,7 @@ QUERY="
   \"query\": \"query {\
     repository(owner: \\\"$OWNER_NAME\\\", name: \\\"$REPO_NAME\\\") {\
       issues(\
-        last: 45,\
+        last: 10,\
         states: [CLOSED]\
       ) {\
         edges {\
@@ -18,10 +18,23 @@ QUERY="
             body\
             url\
             createdAt\
-            comments(last: 10){\
+            comments(last: 5){\
                 edges {\
                     node {\
                         body\
+                    }\
+                }\
+            }\
+            timelineItems(last: 5) {\
+                nodes {\
+                    ... on ClosedEvent {\
+                        closer {\
+                            ... on PullRequest {\
+                                number\
+                                title\
+                                url\
+                            }\
+                        }\
                     }\
                 }\
             }\
@@ -48,6 +61,23 @@ cat response-issues.json | jq -r '
   "## Issue #" + (.node.number | tostring) + ": " + .node.title + "\n" +
   "- Created: " + .node.createdAt + "\n" +
   "### Issue Body:\n" + .node.body + "\n" +
+  "- Comments: " +
+  (if .node.comments.edges | length > 0 then
+    (.node.comments.edges | 
+      map("- " + .node.body) | join("\n")) 
+  else
+    "None"
+  end) + "\n" +
+  "- Timeline Items: " +
+  (if .node.timelineItems.nodes | length > 0 then
+    (.node.timelineItems.nodes |
+      map(
+        "- Type: ClosedEvent" + "\n" +
+        "  Closer Pull Request #" + (.closer.number | tostring) + ": " + .closer.title + .closer.url
+      ) | join("\n"))
+  else
+    "None"
+  end) + "\n" +
   "- Issue URL: " + .node.url + "\n"
 ' >> report-issues.md
 
