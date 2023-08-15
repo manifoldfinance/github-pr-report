@@ -8,22 +8,20 @@ QUERY="
   \"query\": \"query {\
     repository(owner: \\\"$OWNER_NAME\\\", name: \\\"$REPO_NAME\\\") {\
       issues(\
-        last: 10,\
+        last: 20,\
         states: [CLOSED]\
       ) {\
         edges {\
           node {\
-            number\
             title\
-            body\
             url\
             createdAt\
             comments(last: 5){\
-                edges {\
-                    node {\
-                        body\
-                    }\
-                }\
+              edges {\
+                  node {\
+                      body\
+                  }\
+              }\
             }\
             timelineItems(last: 5) {\
                 nodes {\
@@ -33,6 +31,28 @@ QUERY="
                                 number\
                                 title\
                                 url\
+                                body\
+                                closingIssuesReferences(last: 5){\
+                                    edges {\
+                                        node {\
+                                            title\
+                                        }\
+                                    }\
+                                }\
+                                comments(last: 10){\
+                                    edges {\
+                                        node {\
+                                            body\
+                                        }\
+                                    }\
+                                }\
+                                files(last: 10) {\
+                                    edges {\
+                                        node {\
+                                            path\
+                                        }\
+                                    }\
+                                }\
                             }\
                         }\
                     }\
@@ -57,28 +77,50 @@ echo "# Issues Report" > report-issues.md
 echo "" >> report-issues.md
 
 cat response-issues.json | jq -r '
-  .data.repository.issues.edges[] | 
-  "## Issue #" + (.node.number | tostring) + ": " + .node.title + "\n" +
-  "- Created: " + .node.createdAt + "\n" +
-  "### Issue Body:\n" + .node.body + "\n" +
-  "- Comments: " +
+  .data.repository.issues.edges[] |
+  "## Issue: " + .node.title + "\n" +
+  "### Created: " + .node.createdAt + "\n" +
+  "### URL: " + .node.url + "\n" +
+  "### Comments: " +
   (if .node.comments.edges | length > 0 then
-    (.node.comments.edges | 
+    (.node.comments.edges |
       map("- " + .node.body) | join("\n")) 
   else
     "None"
   end) + "\n" +
-  "- Timeline Items: " +
+  "### Timeline Items: " + "\n" +
   (if .node.timelineItems.nodes | length > 0 then
     (.node.timelineItems.nodes |
       map(
-        "- Type: ClosedEvent" + "\n" +
-        "  Closer Pull Request #" + (.closer.number | tostring) + ": " + .closer.title + .closer.url
-      ) | join("\n"))
+        select(.closer != null) |   # Filter out events with null closer
+        " - Closer Pull Request #" + (.closer.number | tostring) + ": " + .closer.title + "\n" +
+        " - URL: " + .closer.url + "\n" +
+        " - Body: " + .closer.body + "\n" +
+        " - Closing Issues: " + 
+        (if .closer.closingIssuesReferences.edges | length > 0 then
+          (.closer.closingIssuesReferences.edges |
+            map("- #" + .node.title) | join(", "))
+        else
+          "None"
+        end) + "\n" +
+        " - Comments: " +
+        (if .closer.comments.edges | length > 0 then
+          (.closer.comments.edges |
+            map("- " + .node.body) | join("\n")) 
+        else
+          "None"
+        end) + "\n" +
+        " - Files: " +
+        (if .closer.files.edges | length > 0 then
+          (.closer.files.edges |
+            map("- " + .node.path) | join("\n"))
+        else
+          "None"
+        end)
+      ) | join("\n\n"))
   else
     "None"
-  end) + "\n" +
-  "- Issue URL: " + .node.url + "\n"
+  end) + "\n\n"
 ' >> report-issues.md
 
 # Optionally, you can remove the response file after processing
